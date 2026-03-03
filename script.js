@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const traceIP = async (ip = '') => {
         showLoading();
         try {
-            const response = await fetch(`https://ip-api.com/json/${ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,mobile,proxy,hosting,query`);
+            const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,mobile,proxy,hosting,query`);
             const data = await response.json();
 
             if (data.status === 'fail') {
