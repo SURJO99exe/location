@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP-Tracer Web Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            background-color: #000;
+            color: #ff0000;
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+            filter: contrast(1.1); /* Removed brightness reduction for better visibility */
+        }
+        .terminal-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            width: 95%;
+            max-width: 1200px;
+            pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform, top, left;
+        }
+        .terminal-overlay.minimized {
+            top: 20px;
+            right: 20px;
+            left: auto;
+            transform: none;
+            width: 350px;
+            max-width: 90%;
+            pointer-events: auto;
+            opacity: 1 !important;
+        }
+        .terminal {
+            border: 2px solid #ff0000;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.4);
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 8px;
+            overflow: hidden;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            transition: all 0.5s ease;
+        }
+        .terminal-overlay.minimized .terminal {
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+        }
+        .terminal-header {
+            background: #ff0000;
+            color: #fff;
+            padding: 10px 20px;
+            font-weight: 900;
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .terminal-overlay.minimized .terminal-header {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .terminal-body {
+            padding: 30px 40px;
+            transition: all 0.5s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: rgba(0, 0, 0, 0.85); /* Ensure solid background */
+            z-index: 11;
+        }
+        .terminal-overlay.minimized .terminal-body {
+            padding: 10px;
+            max-height: 400px; /* Allow content in mini-mode */
+            opacity: 1;
+            pointer-events: auto;
+            overflow: hidden;
+            display: block !important;
+        }
+        .terminal-overlay.minimized .ascii-art,
+        .terminal-overlay.minimized .input-group,
+        .terminal-overlay.minimized .system-status,
+        .terminal-overlay.minimized .instruction-text {
+            display: none;
+        }
+        .terminal-overlay.minimized .info-container {
+            margin-top: 0;
+        }
+        .terminal-overlay.minimized .info-grid {
+            border-left: 2px solid #ff0000;
+            padding-left: 10px;
+            gap: 5px;
+        }
+        .terminal-overlay.minimized .info-item {
+            font-size: 11px;
+        }
+        .terminal-overlay.minimized .info-label {
+            min-width: 80px;
+            font-size: 10px;
+            color: #ff0000;
+        }
+        .terminal-overlay.minimized .info-value {
+            font-size: 11px;
+        }
+        .min-toggle-icon {
+            display: inline-block;
+            transition: transform 0.3s ease;
+        }
+        .terminal-overlay.minimized .min-toggle-icon {
+            transform: rotate(180deg);
+        }
+        input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #ff0000;
+            color: #ff0000;
+            outline: none;
+            width: 100%;
+            padding: 10px 5px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .btn {
+            background: #ff0000;
+            color: #fff;
+            padding: 12px 35px;
+            font-weight: 900;
+            font-size: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            border: none;
+        }
+        .btn:hover {
+            background: #fff;
+            color: #ff0000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        .ascii-art {
+            white-space: pre;
+            font-size: 14px;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            color: #ff0000;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+            text-align: center;
+        }
+        .info-container {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            border-left: 4px solid #ff0000;
+            padding-left: 1.5rem;
+        }
+        .info-item {
+            font-size: 14px;
+            display: flex;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .info-label { 
+            color: #ff0000; 
+            font-weight: bold;
+            min-width: 140px;
+            display: inline-block;
+            text-transform: uppercase;
+            font-size: 13px;
+        }
+        .info-value { 
+            color: #fff; 
+            font-weight: bold;
+            margin-left: 0;
+            word-break: break-word;
+            flex: 1;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .instruction-text {
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #loading {
+            font-size: 18px;
+            color: #ff0000;
+            font-weight: bold;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 0, 0, 0.5);
+            box-shadow: 0 0 15px #ff0000;
+            z-index: 5;
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        .glitch {
+            text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
+                        -0.025em -0.05em 0 rgba(0, 255, 0, 0.75),
+                        0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+            animation: glitch 500ms infinite;
+        }
+        @keyframes glitch {
+            0% { transform: translate(0); text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+            14% { transform: translate(0); text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+            15% { transform: translate(-2px, 1px); text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+            49% { transform: translate(-2px, 1px); text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+            50% { transform: translate(2px, -1px); text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+            99% { transform: translate(2px, -1px); text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+            100% { transform: translate(0); text-shadow: -0.025em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+        }
+        .system-status {
+            font-size: 12px;
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 0, 0, 0.3);
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            opacity: 0.8;
+        }
+        .radar {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 150px;
+            height: 150px;
+            border: 2px solid rgba(255, 0, 0, 0.3);
+            border-radius: 50%;
+            z-index: 15;
+            overflow: hidden;
+            background: rgba(20, 0, 0, 0.4);
+            backdrop-filter: blur(2px);
+            pointer-events: none;
+        }
+        .radar::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            background: conic-gradient(from 0deg, rgba(255, 0, 0, 0.5) 0%, transparent 40%);
+            transform-origin: top left;
+            animation: radar-spin 3s linear infinite;
+        }
+        .radar-cross {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+        .radar-cross::before, .radar-cross::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 0, 0, 0.2);
+        }
+        .radar-cross::before { top: 50%; left: 0; width: 100%; height: 1px; }
+        .radar-cross::after { left: 50%; top: 0; width: 1px; height: 100%; }
+        
+        @keyframes radar-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: #ff0000;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #ff0000;
+            animation: pulse-ring 2s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+        }
+
+        .map-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(rgba(255, 0, 0, 0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 0, 0, 0.02) 1px, transparent 1px);
+            background-size: 100px 100px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .pulse-marker {
+            width: 20px;
+            height: 20px;
+            background: #ff0000;
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 0 20px #ff0000;
+        }
+        .pulse-marker::before,
+        .pulse-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(255, 0, 0, 0.4);
+            animation: marker-ripple 2s infinite;
+        }
+        .pulse-marker::after {
+            animation-delay: 1s;
+        }
+        @keyframes marker-ripple {
+            0% {
+                width: 20px;
+                height: 20px;
+                opacity: 0.8;
+            }
+            100% {
+                width: 80px;
+                height: 80px;
+                opacity: 0;
+            }
+        }
+        .leaflet-popup-content-wrapper {
+            background: #000 !important;
+            color: #ff0000 !important;
+            border: 1px solid #ff0000;
+            border-radius: 0;
+            font-family: 'Fira Code', monospace;
+        }
+        .pulse-marker, .custom-div-icon div:not(.location-pin):not(.pin-dot):not(.ripple) {
+            display: none !important;
+        }
+        /* Futuristic Loading Styles */
+        .loader-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .hex-loader {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+        }
+        .hex {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #ff0000;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            animation: hex-rotate 2s linear infinite;
+            box-shadow: 0 0 15px #ff0000;
+        }
+        .hex:nth-child(2) {
+            transform: scale(0.7);
+            animation-direction: reverse;
+            opacity: 0.7;
+        }
+        .hex:nth-child(3) {
+            transform: scale(0.4);
+            opacity: 0.4;
+        }
+        @keyframes hex-rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-bar-container {
+            width: 300px;
+            height: 10px;
+            border: 1px solid #ff0000;
+            position: relative;
+            overflow: hidden;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        .loading-bar {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: #ff0000;
+            box-shadow: 0 0 10px #ff0000;
+            animation: bar-move 2s infinite;
+        }
+        @keyframes bar-move {
+            0% { left: -100%; }
+            50% { left: 0; }
+            100% { left: 100%; }
+        }
+        .loading-text {
+            font-size: 18px;
+            margin-top: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+            pointer-events: auto;
+        }
+        .zoom-btn, .locate-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ff0000;
+            color: #ff0000;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+        .zoom-btn:hover, .locate-btn:hover {
+            background: #ff0000;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+        }
+        .locate-btn svg {
+            width: 30px;
+            height: 30px;
+            fill: currentColor;
+        }
+        .leaflet-control-zoom {
+            display: none !important;
+        }
+        .terminal-overlay, .radar, .zoom-controls, .scan-line {
+            transition: opacity 0.4s ease-in-out;
+        }
+        /* Updated Red Pin Styles to match user image exactly */
+        .location-pin {
+            width: 60px;
+            height: 60px;
+            background-image: url('red-pin.png'); /* New 3D location icon from pngtree */
+            background-size: contain;
+            background-repeat: no-repeat;
+            filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.6));
+            animation: pin-float 2s ease-in-out infinite;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Final 3D Red Pin Logo Styles */
+        .location-pin-container {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pin-float 2s ease-in-out infinite, pin-blink 1s ease-in-out infinite;
+            z-index: 1000; /* Ensure pin is above all circles */
+        }
+        @keyframes pin-blink {
+            0%, 100% { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.6)) brightness(1); }
+            50% { filter: drop-shadow(0 0 30px rgba(255, 255, 255, 1)) brightness(1.5); }
+        }
+        .custom-logo-pin {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            position: relative;
+            z-index: 5;
+            filter: brightness(0) invert(1); /* Makes the red pin white */
+        }
+        .custom-3d-pin, .pin-dot {
+            display: none !important;
+        }
+        .pin-shadow {
+            width: 40px;
+            height: 12px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 50%;
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%) rotateX(60deg);
+            filter: blur(3px);
+            z-index: -1;
+        }
+        @keyframes pin-float {
+            0%, 100% { transform: translateY(-10px); }
+            50% { transform: translateY(-25px); }
+        }
+        .ripple {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 2px;
+            border: 4px solid #ffffff;
+            border-radius: 50%;
+            animation: pin-ripple 1.5s linear infinite;
+            box-shadow: 0 0 20px #ffffff;
+        }
+        @keyframes pin-ripple {
+            0% { width: 0; height: 0; opacity: 1; border-width: 4px; }
+            100% { width: 150px; height: 60px; opacity: 0; border-width: 1px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="scan-line"></div>
+    
+    <div class="radar">
+        <div class="radar-cross"></div>
+        <div class="pulse"></div>
+    </div>
+    <div class="zoom-controls">
+        <button id="zoom-in" class="zoom-btn" title="Zoom In">+</button>
+        <button id="zoom-out" class="zoom-btn" title="Zoom Out">-</button>
+        <button id="locate-target" class="locate-btn" title="Locate Target">
+            <svg viewBox="0 0 24 24">
+                <path d="M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13Z" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="terminal-overlay">
+        <div class="terminal">
+            <div class="terminal-header" id="terminal-header">
+                <span class="glitch">IP-TRACER WEB v1.0</span>
+                <div class="flex items-center gap-2">
+                    <span>[ SYSTEM ACTIVE ]</span>
+                    <span class="min-toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="terminal-body">
+                <div class="ascii-art">
+   _____  _____    _______ _____            _____  ______ _____ 
+  |_   _||  __ \  |__   __|  __ \    /\    / ____||  ____||  __ \
+    | |  | |__) |    | |  | |__) |  /  \  | |     | |__   | |__) |
+    | |  |  ___/     | |  |  _  /  / /\ \ | |     |  __|  |  _  /
+   _| |_ | |         | |  | | \ \ / ____ \| |____ | |____ | | \ \
+  |_____||_|         |_|  |_|  \_/_/    \_\\_____||______||_|  \_\
+                </div>
+
+                <div class="input-group">
+                    <p class="instruction-text">Enter target IP address or leave empty for your own IP:</p>
+                    <div class="flex gap-6 items-end">
+                        <span class="text-4xl font-bold mb-1">$</span>
+                        <input type="text" id="ip-input" placeholder="0.0.0.0" autofocus>
+                        <button id="trace-btn" class="btn">TRACE</button>
+                    </div>
+                </div>
+
+                <div id="loading" class="hidden">
+                    <div class="loader-container">
+                        <div class="hex-loader">
+                            <div class="hex"></div>
+                            <div class="hex"></div>
+                            <div class="hex"></div>
+                        </div>
+                        <div class="loading-bar-container">
+                            <div class="loading-bar"></div>
+                        </div>
+                        <span class="loading-text animate-pulse">[ ACCESSING SATELLITE NETWORK... ]</span>
+                        <div id="loading-subtext" class="text-xs mt-2 opacity-60">ESTABLISHING SECURE CONNECTION</div>
+                    </div>
+                </div>
+
+                <div id="result" class="hidden">
+                    <div class="info-container">
+                        <div class="info-grid">
+                            <div class="info-item"><span class="info-label">IP ADDRESS  :</span> <span id="res-ip" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">CONTINENT   :</span> <span id="res-continent" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">COUNTRY     :</span> <span id="res-country" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">FULL ADDRESS:</span> <span id="res-full-address" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">VILLAGE/AREA:</span> <span id="res-village" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">UPAZILA/SUB :</span> <span id="res-upazila" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">DISTRICT    :</span> <span id="res-district" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">DIVISION    :</span> <span id="res-division" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">ZIP CODE    :</span> <span id="res-zip" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">LATITUDE    :</span> <span id="res-lat" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">LONGITUDE   :</span> <span id="res-lon" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">TIMEZONE    :</span> <span id="res-timezone" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">CURRENCY    :</span> <span id="res-currency" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">ISP         :</span> <span id="res-isp" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">ORG         :</span> <span id="res-org" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">AS INFO     :</span> <span id="res-as" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">MOBILE      :</span> <span id="res-mobile" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">PROXY/VPN   :</span> <span id="res-proxy" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">HOSTING     :</span> <span id="res-hosting" class="info-value"></span></div>
+                            <div class="info-item"><span class="info-label">SECURITY    :</span> <span id="res-security" class="info-value"></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="error" class="hidden mt-4 text-red-500 text-center">
+                    [!] ERROR: <span id="error-msg"></span>
+                </div>
+
+                <div class="system-status">
+                    <span>STATUS: ONLINE</span>
+                    <span>CONNECTION: ENCRYPTED</span>
+                    <span>GEO-LOCATOR: READY</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
