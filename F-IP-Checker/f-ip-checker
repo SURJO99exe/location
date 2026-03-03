@@ -22,7 +22,7 @@ case "$1" in
     php modules/.update.php
     exit
   ;;
-  -u)
+  update)
     php modules/.update.php
     exit
   ;;
