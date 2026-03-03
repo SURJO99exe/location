@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tool Name :- F-IP-Checker
-# Author :- SURJO99exe
-# Date :- 03/03/2026
+# Tool Name :- IP-Tracer
+# Author :- Rajkumar Dusad
+# Date :- 10/10/2018
 
 case "$1" in
   -m)
@@ -10,11 +10,11 @@ case "$1" in
   -t)
     case "$#" in
     2)
-      php modules/.tracefip.php $2
+      php modules/.traceip.php $2
     ;;
     *)
       echo "error : invalid arguments !!"
-      echo "use: f-ip-checker -t <target_ip>"
+      echo "use: ip-tracer -t <target_ip>"
     ;;
     esac
   ;;
@@ -27,7 +27,7 @@ case "$1" in
     exit
   ;;
   start)
-    php .F-IP-Checker.php
+    php .IP-Tracer.php
     exit
   ;;
   -rm)
@@ -35,13 +35,13 @@ case "$1" in
     exit
   ;;
   *)
-    echo "Usage: f-ip-checker [command]... [arguments]..."
+    echo "Usage: ip-tracer [command]... [arguments]..."
     echo " Commands:"
     echo " -t <target_ip>      to trace target ip."
     echo " -m                  to trace your own ip."
     echo " -h                  to show help."
-    echo " -u                  to update f-ip-checker."
+    echo " -u                  to update ip-tracer."
     echo " help                to show help."
-    echo " update              to update f-ip-checker."
-    echo " start               to start f-ip-checker menu."
+    echo " update              to update ip-tracer."
+    echo " start               to start ip-tracer menu."
 esac
