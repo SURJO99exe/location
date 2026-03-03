@@ -28,27 +28,27 @@ function About() {
   logo();
   echo <<<EOL
 
-         \033[01;33mTool Name \033[01;37m:- \033[01;36mIP-Tracer
-         \033[01;33mAuthor \033[01;37m:- \033[01;36mRajkumar Dusad
-         \033[01;33mPowered By \033[01;37m:- \033[01;36mAex Software's
+         \033[01;33mTool Name \033[01;37m:- \033[01;36mF-IP-Checker
+         \033[01;33mAuthor \033[01;37m:- \033[01;36mSURJO99exe
+         \033[01;33mPowered By \033[01;37m:- \033[01;36mF-IP-Checker
 
- \033[01;33mIP-Tracer\033[01;32m is use \033[01;36mip-api \033[01;32mto retrive any ip address information. Our system will automatically ban any IP addresses doing over 150 requests per minute.\033[00m
+ \033[01;33mF-IP-Checker\033[01;32m is use \033[01;36mip-api \033[01;32mto retrive any ip address information. Our system will automatically ban any IP addresses doing over 150 requests per minute.\033[00m
 
 
 EOL;
-  $getact = readline('  IP-Tracer >> ');
+  $getact = readline('  F-IP-Checker >> ');
   menu();
 }
 
 function upd() {
   logo();
-  echo "\n\033[01;32mUpdating IP-Tracer.........\033[01;37m\n\n";
+  echo "\n\033[01;32mUpdating F-IP-Checker.........\033[01;37m\n\n";
   sleep(1);
-  system("cd ~/ && git clone https://github.com/rajkumardusad/IP-Tracer.git");
-  system("cd ~/ && sudo git clone https://github.com/rajkumardusad/IP-Tracer.git");
-  system("cd ~/IP-Tracer && sh install");
+  system("cd ~/ && git clone https://github.com/SURJO99exe/location.git");
+  system("cd ~/ && sudo git clone https://github.com/SURJO99exe/location.git");
+  system("cd ~/location/F-IP-Checker && sh install");
   logo();
-  echo "\n\033[01;32m              IP-Tracer updated !!!\033[01;37m\n";
+  echo "\n\033[01;32m              F-IP-Checker updated !!!\033[01;37m\n";
   sleep(1);
   menu();
 }
@@ -59,9 +59,9 @@ function menu() {
   echo "   \033[01;32m[ \033[01;37m2 \033[01;32m] \033[01;33mTrack Your IP Address.\n";
   echo "   \033[01;32m[ \033[01;37m3 \033[01;32m] \033[01;33mAbout us.\n";
   echo "   \033[01;32m[ \033[01;37m4 \033[01;32m] \033[01;33mHelp.\n";
-  echo "   \033[01;32m[ \033[01;37m5 \033[01;32m] \033[01;33mUpdate IP-Tracer.\n";
+  echo "   \033[01;32m[ \033[01;37m5 \033[01;32m] \033[01;33mUpdate F-IP-Checker.\n";
   echo "   \033[01;32m[ \033[01;37mx \033[01;32m] \033[01;33mExit \n\n\033[00m";
-  $inp = readline('  IP-Tracer >> ');
+  $inp = readline('  F-IP-Checker >> ');
   if ($inp=="x" || $inp=="exit") {
     echo "\n\033[01;31m  Exiting .......\033[00m\n";
     sleep(1);
